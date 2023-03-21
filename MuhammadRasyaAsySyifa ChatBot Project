@@ -1,0 +1,96 @@
+import telegram
+import requests
+import difflib
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+
+# Masukkan token bot Telegram yang kamu dapatkan dari @BotFather
+TOKEN = '(token)'
+
+# Inisialisasi bot
+bot = telegram.Bot(token=TOKEN)
+
+# Inisialisasi daftar link berbahaya
+malicious_urls = ['http://malware.com', 'http://virus.com']
+
+# Fungsi untuk mendeteksi link berbahaya
+def detect_malicious_url(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            if 'malware' in response.content.decode().lower():
+                return True
+            else:
+                return False
+        else:
+            return False
+    except:
+        return False
+
+# Fungsi untuk menangani perintah /start
+def start(update, context):
+    update.message.reply_text('Halo, saya adalah bot deteksi link berbahaya. '
+                              'Kirimkan link yang ingin kamu periksa!')
+
+# Fungsi untuk menangani pesan yang diterima oleh bot
+def handle_message(update, context):
+    message_text = update.message.text
+    if 'http' in message_text:
+        for malicious_url in malicious_urls:
+            if difflib.SequenceMatcher(None, malicious_url, message_text).ratio() >= 0.8:
+                update.message.reply_text('Link tersebut mirip dengan link berbahaya yang telah terdeteksi!')
+                return
+        if detect_malicious_url(message_text):
+            update.message.reply_text('Link tersebut mungkin mengandung virus atau malware!')
+        else:
+            update.message.reply_text('Link tersebut aman untuk diakses.')
+    else:
+        update.message.reply_text('Mohon kirimkan link yang ingin dideteksi.')
+
+# Fungsi untuk menangani pesan yang mengandung media, seperti gambar atau file
+def handle_media(update, context):
+    if update.message.document or update.message.photo:
+        update.message.reply_text('Maaf, saya tidak dapat memeriksa file atau gambar.')
+    else:
+        update.message.reply_text('Maaf, saya hanya dapat memeriksa link.')
+
+# Fungsi untuk menangani perintah /help
+def help(update, context):
+    update.message.reply_text('Kirimkan link yang ingin kamu periksa, dan saya akan memberikan '
+                              'informasi apakah link tersebut aman atau tidak. '
+                              'Saya juga dapat memberikan peringatan jika link yang kamu kirimkan '
+                              'mirip dengan link berbahaya yang telah terdeteksi sebelumnya.')
+
+# Fungsi untuk menangani pesan yang tidak dapat dipahami
+def unknown(update, context):
+    update.message.reply_text('Maaf, saya tidak mengerti perintah tersebut. '
+                              'Silakan kirimkan /help untuk mengetahui perintah yang tersedia.')
+
+# Inisialisasi updater
+updater = Updater(TOKEN, use_context=True)
+
+# Inisialisasi dispatcher
+dispatcher = updater.dispatcher
+
+# Tambahkan handler untuk perintah /start
+dispatcher.add_handler(CommandHandler('start', start))
+
+# Tambahkan handler untuk pesan teks
+dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+
+# Tambahkan handler untuk pesan media
+dispatcher.add_handler(MessageHandler(Filters.document | Filters.photo, handle_media))
+
+#Tambahkan handler untuk perintah /help
+dispatcher.add_handler(CommandHandler('help', help))
+
+#Tambahkan handler untuk pesan yang tidak dapat dipahami
+dispatcher.add_handler(MessageHandler(Filters.command, unknown))
+
+#Mulai polling bot
+updater.start_polling()
+
+#Tampilkan pesan di terminal jika bot sedang berjalan, Ketikkan CTRL+C untuk berhenti.
+print('Bot sedang berjalan.')
+
+#Jaga agar bot tetap berjalan
+updater.idle()
